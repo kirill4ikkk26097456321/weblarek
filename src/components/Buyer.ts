@@ -1,4 +1,4 @@
-import { IBuyer, TPayment } from '../../../types';
+import { IBuyer, TPayment } from '../types';
 
 export class Buyer {
   protected data: IBuyer = {
