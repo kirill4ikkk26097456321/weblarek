@@ -1,5 +1,4 @@
-import { Api } from './base/Api';
-import { IOrder, IOrderResult, IProductList } from '../types';
+import { IOrder, IOrderResult, IProductList, IApi } from '../types';
 
 export interface ILarekApi {
   getProducts: () => Promise<IProductList>;
@@ -7,9 +6,9 @@ export interface ILarekApi {
 }
 
 export class LarekApi implements ILarekApi {
-  private _baseApi: Api;
+  private _baseApi: IApi;
 
-  constructor(baseApi: Api) {
+  constructor(baseApi: IApi) {
     this._baseApi = baseApi;
   }
 

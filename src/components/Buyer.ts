@@ -1,8 +1,8 @@
-import { IBuyer, TPayment } from '../types';
+import { IBuyer, FormErrors } from '../types';
 
 export class Buyer {
   protected data: IBuyer = {
-    payment: 'card',
+    payment: null,
     email: '',
     phone: '',
     address: ''
@@ -18,15 +18,16 @@ export class Buyer {
 
   clear(): void {
     this.data = {
-      payment: 'card',
+      payment: null,
       email: '',
       phone: '',
       address: ''
     };
   }
 
-  validate(): Partial<Record<keyof IBuyer, string>> {
-    const errors: Partial<Record<keyof IBuyer, string>> = {};
+  validate(): FormErrors {
+    const errors: FormErrors = {};
+    
     if (!this.data.payment) {
       errors.payment = 'Не выбран вид оплаты';
     }
@@ -39,6 +40,7 @@ export class Buyer {
     if (!this.data.phone) {
       errors.phone = 'Укажите телефон';
     }
+    
     return errors;
   }
 }
