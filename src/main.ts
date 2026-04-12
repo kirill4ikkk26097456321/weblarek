@@ -7,12 +7,12 @@ import { Api } from './components/base/Api';
 import { API_URL, settings } from './utils/constants';
 import { apiProducts } from './utils/data';
 
-// --- Инициализация моделей ---
+
 const productsModel = new Products();
 const basketModel = new Basket();
 const buyerModel = new Buyer();
 
-// --- 1. Тестирование Buyer ---
+
 console.log('--- Тестирование Buyer ---');
 buyerModel.setField('email', 'test@test.ru');
 buyerModel.setField('address', 'Москва, ул. Пушкина');
@@ -21,9 +21,8 @@ console.log('Ошибки валидации:', buyerModel.validate());
 buyerModel.clear();
 console.log('После очистки:', buyerModel.getData());
 
-// --- 2. Тестирование Products на моковых данных ---
 console.log('--- Тестирование Products ---');
-productsModel.setItems(apiProducts.items); // Используем моки!
+productsModel.setItems(apiProducts.items);
 console.log('Массив товаров из каталога (mock): ', productsModel.getItems());
 
 const mockProduct = apiProducts.items[0];
@@ -32,7 +31,6 @@ if (mockProduct) {
   console.log('Превью товара (mock): ', productsModel.getPreview());
   console.log('Поиск по ID (mock): ', productsModel.getProduct(mockProduct.id));
 
-  // --- 3. Тестирование Basket на моковых данных ---
   console.log('--- Тестирование Basket ---');
   basketModel.add(mockProduct);
   console.log('Корзина после добавления (mock): ', basketModel.getItems());
@@ -44,10 +42,9 @@ if (mockProduct) {
   console.log('После удаления (mock): ', basketModel.getItems());
 }
 
-// --- 4. Инициализация и тестирование API (Коммуникационный слой) ---
 console.log('--- Тестирование API ---');
 const baseApi = new Api(API_URL, settings);
-const larekApi = new LarekApi(baseApi); // Передаем экземпляр в конструктор
+const larekApi = new LarekApi(baseApi);
 
 larekApi.getProducts()
   .then((data) => {
