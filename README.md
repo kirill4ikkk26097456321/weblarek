@@ -153,7 +153,142 @@ Presenter - презентер содержит основную логику п
 ### Класс `LarekApi`
 Наследует базовый класс `Api` и предоставляет методы для взаимодействия с бекендом проекта (получение товаров и отправка заказа).
 * Конструктор:
-  * `constructor(baseUrl: string, options?: RequestInit)` - принимает базовый URL и опциональные настройки запроса.
+  * `constructor(baseApi: IApi)` - принимает экземпляр базового Api-класса.
 * Методы:
   * `getProducts(): Promise<IProductList>` - получает список всех товаров с сервера.
   * `orderProducts(order: IOrder): Promise<IOrderResult>` - отправляет сформированный заказ на сервер и возвращает результат.
+
+## Слой представления (View)
+
+Все компоненты представления наследуются от базового класса `Component<T>` (кроме `Modal`), не хранят бизнес-данных и не содержат бизнес-логики. Каждый компонент обновляет DOM в методе `render(data?)`, возвращающем корневой элемент, и сообщает о действиях пользователя через брокер событий (`IEvents`).
+
+### Класс `Modal`
+Управляет модальным окном. Не наследуется от `Component`, так как имеет собственную логику управления видимостью.
+* Конструктор:
+  * `constructor(container: HTMLElement, events: IEvents)` - принимает DOM-элемент модального окна (`#modal-container`) и брокер событий.
+  * В конструкторе находит кнопку закрытия (`.modal__close`) и контейнер контента (`.modal__content`), навешивает обработчики на крестик, оверлей и клавишу Escape.
+* Методы:
+  * `open(): void` - показывает модальное окно, добавляя класс `modal_active`. Блокирует скролл страницы.
+  * `close(): void` - скрывает окно, удаляя класс `modal_active`. Разблокирует скролл, очищает контент и генерирует событие `modal:close`.
+  * `render(data: { content: HTMLElement }): HTMLElement` - устанавливает контент и открывает окно.
+* Генерируемые события:
+  * `modal:close` — при закрытии окна.
+
+### Класс `Card`
+Базовый компонент карточки товара. Наследуется от `Component<ICardData>`.
+* Конструктор:
+  * `constructor(container: HTMLElement)` - находит DOM-элементы: `.card__title`, `.card__image`, `.card__price`, `.card__category`.
+* Методы:
+  * `render(data: Partial<ICardData>): HTMLElement` - обновляет заголовок, изображение (с CDN_URL), цену и категорию (с цветовым модификатором из `categoryMap`).
+
+### Класс `CardCatalog` (наследник `Card`)
+Карточка товара в каталоге на главной странице.
+* Конструктор:
+  * `constructor(container: HTMLElement, events: IEvents)` - дополнительно навешивает обработчик клика, генерирующий событие `card:select`.
+* Генерируемые события:
+  * `card:select` — с данными `{ id: string }`.
+
+### Класс `CardPreview` (наследник `Card`)
+Карточка товара в модальном окне (детальный просмотр).
+* Конструктор:
+  * `constructor(container: HTMLElement, events: IEvents)` - дополнительно находит описание (`.card__text`) и кнопку (`.card__button`). Навешивает обработчик на кнопку.
+* Поведение кнопки:
+  * Если товар не в корзине — текст "Купить", генерирует событие `card:toBasket`.
+  * Если товар в корзине — текст "Удалить из корзины", генерирует событие `card:fromBasket`.
+  * Если цена `null` — кнопка заблокирована, текст "Недоступно".
+* Генерируемые события:
+  * `card:toBasket` — `{ id: string }`, при добавлении в корзину.
+  * `card:fromBasket` — `{ id: string }`, при удалении из корзины.
+
+### Класс `CardBasket` (наследник `Component<ICardBasketData>`)
+Карточка товара в списке корзины.
+* Конструктор:
+  * `constructor(container: HTMLElement, events: IEvents)` - находит элементы индекса (`.basket__item-index`), названия (`.card__title`), цены (`.card__price`) и кнопки удаления (`.basket__item-delete`).
+* Генерируемые события:
+  * `card:removeFromBasket` — `{ id: string }`, при удалении из корзины.
+
+### Класс `BasketView`
+Представление корзины. Наследуется от `Component<IBasketView>`.
+* Конструктор:
+  * `constructor(container: HTMLElement, events: IEvents)` - находит список (`.basket__list`), цену (`.basket__price`) и кнопку оформления (`.basket__button`).
+* Методы:
+  * `render(data: Partial<IBasketView>): HTMLElement` - отображает список карточек и итоговую сумму. Блокирует кнопку "Оформить", если список пуст.
+* Генерируемые события:
+  * `order:open` — при клике на кнопку "Оформить".
+
+### Класс `Form<T>`
+Базовый компонент формы. Наследуется от `Component<IFormState>`.
+* Конструктор:
+  * `constructor(container: HTMLFormElement, events: IEvents)` - находит кнопку submit (`[type="submit"]`) и блок ошибок (`.form__errors`). Навешивает делегированный обработчик `input` и обработчик `submit` (с `preventDefault`).
+* Методы:
+  * `render(data: Partial<IFormState>): HTMLElement` - управляет блокировкой кнопки submit (`valid`) и отображением ошибок валидации (`errors`).
+* Генерируемые события:
+  * `[имя_формы].[имя_поля]:change` — при вводе в поле, с данными `{ field, value }`.
+  * `[имя_формы]:submit` — при отправке формы.
+
+### Класс `OrderForm` (наследник `Form`)
+Форма шага 1 оформления: выбор способа оплаты и адрес доставки.
+* Конструктор:
+  * `constructor(container: HTMLFormElement, events: IEvents)` - дополнительно находит кнопки выбора оплаты (`[name="card"]`, `[name="cash"]`). Выделение активной кнопки через модификатор `button_alt-active`.
+* Генерируемые события:
+  * `order.payment:change` — при выборе способа оплаты, с данными `{ field: 'payment', value: 'card' | 'cash' }`.
+
+### Класс `ContactsForm` (наследник `Form`)
+Форма шага 2 оформления: email и телефон.
+* Конструктор:
+  * `constructor(container: HTMLFormElement, events: IEvents)` - вся логика делегирована в базовый `Form`.
+* Генерируемые события (через базовый `Form`):
+  * `contacts.email:change` — при вводе email.
+  * `contacts.phone:change` — при вводе телефона.
+  * `contacts:submit` — при отправке формы.
+
+### Класс `Page`
+Компонент главной страницы. Наследуется от `Component<IPageView>`.
+* Конструктор:
+  * `constructor(container: HTMLElement, events: IEvents)` - находит счётчик корзины (`.header__basket-counter`), иконку корзины (`.header__basket`), каталог (`.gallery`) и обёртку страницы (`.page__wrapper`).
+* Методы:
+  * `render(data: Partial<IPageView>): HTMLElement` - обновляет счётчик корзины (`counter`), отображает карточки каталога (`catalog`), управляет блокировкой прокрутки (`locked`) через класс `page__wrapper_locked`.
+* Генерируемые события:
+  * `basket:open` — при клике на иконку корзины.
+
+### Класс `Success`
+Экран успешного оформления заказа. Наследуется от `Component<ISuccessView>`.
+* Конструктор:
+  * `constructor(container: HTMLElement, events: IEvents)` - находит описание (`.order-success__description`) и кнопку (`.order-success__close`).
+* Методы:
+  * `render(data: Partial<ISuccessView>): HTMLElement` - отображает сумму списанных синапсов.
+* Генерируемые события:
+  * `success:close` — при клике на кнопку "За новыми покупками!".
+
+## Презентер
+
+Код Презентера располагается в файле `src/main.ts`. Он не выделен в отдельный класс, а реализован как набор обработчиков событий, связывающих модели и представления.
+
+### Основные сценарии:
+
+1. **Загрузка каталога** — при старте приложения загружаются товары с сервера через `LarekApi`, сохраняются в `Products` и рендерятся через `CardCatalog` в `Page`.
+2. **Просмотр товара** — событие `card:select` → товар извлекается из `Products`, рендерится `CardPreview` и отображается в `Modal`.
+3. **Добавление в корзину** — `card:toBasket` → товар добавляется в `Basket`, обновляется счётчик на `Page`, обновляется кнопка в `CardPreview`.
+4. **Удаление из корзины** — `card:fromBasket` (из превью) или `card:removeFromBasket` (из списка корзины) → товар удаляется из `Basket`, обновляется интерфейс.
+5. **Открытие корзины** — `basket:open` → рендерится `BasketView` с карточками `CardBasket` и отображается в `Modal`.
+6. **Оформление заказа (шаг 1)** — `order:open` → рендерится `OrderForm` в `Modal`. Изменения полей через `order.payment:change` и `order.address:change` записываются в `Buyer` и валидируются.
+7. **Оформление заказа (шаг 2)** — `order:submit` → рендерится `ContactsForm` в `Modal`. Изменения через `contacts.email:change` и `contacts.phone:change` записываются в `Buyer`.
+8. **Отправка заказа** — `contacts:submit` → формируется объект `IOrder`, отправляется через `LarekApi.orderProducts()`. При успехе отображается `Success`, корзина и данные покупателя очищаются.
+9. **Управление модальным окном** — при открытии блокируется прокрутка страницы (`Page.locked = true`), при `modal:close` разблокируется (`Page.locked = false`).
+
+### Список событий:
+
+| Событие | Источник | Действие Презентера |
+|---------|----------|---------------------|
+| `card:select` | `CardCatalog` | Открыть `CardPreview` в модальном окне |
+| `card:toBasket` | `CardPreview` | Добавить товар в `Basket`, обновить счётчик |
+| `card:fromBasket` | `CardPreview` | Удалить товар из `Basket`, обновить счётчик |
+| `card:removeFromBasket` | `CardBasket` | Удалить товар, перерисовать корзину |
+| `basket:open` | `Page` | Открыть `BasketView` в модальном окне |
+| `order:open` | `BasketView` | Открыть `OrderForm` в модальном окне |
+| `order.*:change` | `OrderForm` | Записать поле в `Buyer`, валидировать |
+| `order:submit` | `OrderForm` | Открыть `ContactsForm` |
+| `contacts.*:change` | `ContactsForm` | Записать поле в `Buyer`, валидировать |
+| `contacts:submit` | `ContactsForm` | Отправить заказ на сервер |
+| `success:close` | `Success` | Закрыть модальное окно |
+| `modal:close` | `Modal` | Разблокировать прокрутку страницы |

@@ -1,61 +1,278 @@
 import './scss/styles.scss';
+
+import { EventEmitter } from './components/base/Events';
+import { Api }          from './components/base/Api';
+
 import { Products } from './components/Products';
-import { Basket } from './components/Basket';
-import { Buyer } from './components/Buyer';
+import { Basket }   from './components/Basket';
+import { Buyer }    from './components/Buyer';
+
 import { LarekApi } from './components/LarekApi';
-import { Api } from './components/base/Api';
-import { API_URL, settings } from './utils/constants';
-import { apiProducts } from './utils/data';
 
-const productsModel = new Products();
-const basketModel = new Basket();
-const buyerModel = new Buyer();
+import { Page }       from './components/view/Page';
+import { Modal }      from './components/view/Modal';
+import { BasketView } from './components/view/BasketView';
+import { CardCatalog, CardPreview, CardBasket } from './components/view/Card';
+import { OrderForm, ContactsForm }              from './components/view/Form';
+import { Success }    from './components/view/Success';
 
-console.log('--- Тестирование Buyer ---');
-buyerModel.setField('email', 'test@test.ru');
-buyerModel.setField('address', 'Москва, ул. Пушкина');
-console.log('Данные покупателя:', buyerModel.getData());
-console.log('Ошибки валидации:', buyerModel.validate());
-buyerModel.clear();
-console.log('После очистки:', buyerModel.getData());
+import { cloneTemplate, ensureElement } from './utils/utils';
+import { API_URL, settings }            from './utils/constants';
+import { IBuyer, IProduct, FormErrors }  from './types';
 
-console.log('--- Тестирование Products (mock) ---');
-productsModel.setItems(apiProducts.items);
-console.log('Массив товаров из каталога (mock): ', productsModel.getItems());
+const events = new EventEmitter();
 
-const mockProduct1 = apiProducts.items[0];
-const mockProduct2 = apiProducts.items[1];
+events.onAll(({ eventName, data }) => {
+  console.log(`[EVENT] ${eventName}`, data);
+});
 
-if (mockProduct1) {
-  productsModel.setPreview(mockProduct1);
-  console.log('Превью товара (mock): ', productsModel.getPreview());
-  console.log('Поиск по ID (mock): ', productsModel.getProduct(mockProduct1.id));
+const productsModel = new Products(events);
+const basketModel   = new Basket(events);
+const buyerModel    = new Buyer(events);
+
+const baseApi   = new Api(API_URL, settings);
+const larekApi  = new LarekApi(baseApi);
+
+const cardCatalogTemplate  = ensureElement<HTMLTemplateElement>('#card-catalog');
+const cardPreviewTemplate  = ensureElement<HTMLTemplateElement>('#card-preview');
+const cardBasketTemplate   = ensureElement<HTMLTemplateElement>('#card-basket');
+const basketTemplate       = ensureElement<HTMLTemplateElement>('#basket');
+const orderTemplate        = ensureElement<HTMLTemplateElement>('#order');
+const contactsTemplate     = ensureElement<HTMLTemplateElement>('#contacts');
+const successTemplate      = ensureElement<HTMLTemplateElement>('#success');
+
+const page = new Page(document.body, events);
+
+const modal = new Modal(
+  ensureElement<HTMLElement>('#modal-container'),
+  events
+);
+
+const basketView = new BasketView(
+  cloneTemplate(basketTemplate),
+  events
+);
+
+const orderForm = new OrderForm(
+  cloneTemplate<HTMLFormElement>(orderTemplate),
+  events
+);
+
+const contactsForm = new ContactsForm(
+  cloneTemplate<HTMLFormElement>(contactsTemplate),
+  events
+);
+
+const successView = new Success(
+  cloneTemplate(successTemplate),
+  events
+);
+
+function renderBasket(): HTMLElement {
+  const items = basketModel.getItems();
+
+  return basketView.render({
+    total: basketModel.getTotal(),
+    items: items.map((product, index) => {
+      const card = new CardBasket(cloneTemplate(cardBasketTemplate), events);
+      return card.render({
+        id:    product.id,
+        title: product.title,
+        price: product.price,
+        index: index + 1,
+      });
+    }),
+  });
 }
 
-console.log('--- Тестирование Basket ---');
-if (mockProduct1 && mockProduct2) {
-  basketModel.add(mockProduct1);
-  basketModel.add(mockProduct2);
-  console.log('Корзина после добавления (mock): ', basketModel.getItems());
-  console.log('Сумма (mock): ', basketModel.getTotal());
-  console.log('Количество (mock): ', basketModel.getCount());
+events.on('basket:change', () => {
+  page.render({ counter: basketModel.getCount() });
+});
 
-  basketModel.remove(mockProduct1.id);
-  console.log('После удаления (mock): ', basketModel.getItems());
+events.on<FormErrors>('formErrors:change', (errors) => {
 
-  basketModel.clear();
-  console.log('Корзина после clear (mock): ', basketModel.getItems());
-}
+  const orderMessages = [errors.payment, errors.address].filter(Boolean) as string[];
+  orderForm.render({
+    valid:  orderMessages.length === 0,
+    errors: orderMessages,
+  });
 
-console.log('--- Тестирование API ---');
-const baseApi = new Api(API_URL, settings);
-const larekApi = new LarekApi(baseApi);
+  const contactsMessages = [errors.email, errors.phone].filter(Boolean) as string[];
+  contactsForm.render({
+    valid:  contactsMessages.length === 0,
+    errors: contactsMessages,
+  });
+});
 
-larekApi.getProducts()
+events.on<{ id: string }>('card:select', ({ id }) => {
+  const product = productsModel.getProduct(id);
+  if (!product) return;
+
+  productsModel.setPreview(product);
+
+  const card = new CardPreview(cloneTemplate(cardPreviewTemplate), events);
+  modal.render({
+    content: card.render({
+      id:          product.id,
+      title:       product.title,
+      image:       product.image,
+      price:       product.price,
+      category:    product.category,
+      description: product.description,
+      inBasket:    basketModel.contains(product.id),
+    }),
+  });
+});
+
+events.on<{ id: string }>('card:toBasket', ({ id }) => {
+  const product = productsModel.getProduct(id);
+  if (!product) return;
+
+  basketModel.add(product);
+
+  const preview = productsModel.getPreview();
+  if (preview?.id === id) {
+
+    const card = new CardPreview(cloneTemplate(cardPreviewTemplate), events);
+    modal.render({
+      content: card.render({
+        id:          preview.id,
+        title:       preview.title,
+        image:       preview.image,
+        price:       preview.price,
+        category:    preview.category,
+        description: preview.description,
+        inBasket:    true,
+      }),
+    });
+  }
+});
+
+events.on<{ id: string }>('card:fromBasket', ({ id }) => {
+  basketModel.remove(id);
+
+  const preview = productsModel.getPreview();
+  if (preview?.id === id) {
+    const card = new CardPreview(cloneTemplate(cardPreviewTemplate), events);
+    modal.render({
+      content: card.render({
+        id:          preview.id,
+        title:       preview.title,
+        image:       preview.image,
+        price:       preview.price,
+        category:    preview.category,
+        description: preview.description,
+        inBasket:    false,
+      }),
+    });
+  }
+});
+
+events.on<{ id: string }>('card:removeFromBasket', ({ id }) => {
+  basketModel.remove(id);
+
+  modal.render({ content: renderBasket() });
+});
+
+events.on('basket:open', () => {
+  modal.render({ content: renderBasket() });
+});
+
+events.on('order:open', () => {
+  const buyer = buyerModel.getData();
+  modal.render({
+    content: orderForm.render({
+      payment: buyer.payment,
+      address: buyer.address,
+      valid:   false,
+      errors:  [],
+    }),
+  });
+});
+
+events.on<{ field: keyof IBuyer; value: string }>(
+  /^order\..+:change$/,
+  ({ field, value }) => {
+    buyerModel.setField(field, value as IBuyer[typeof field]);
+  }
+);
+
+events.on('order:submit', () => {
+  const buyer = buyerModel.getData();
+  modal.render({
+    content: contactsForm.render({
+      email: buyer.email,
+      phone: buyer.phone,
+      valid: false,
+      errors: [],
+    }),
+  });
+});
+
+events.on<{ field: keyof IBuyer; value: string }>(
+  /^contacts\..+:change$/,
+  ({ field, value }) => {
+    buyerModel.setField(field, value as IBuyer[typeof field]);
+  }
+);
+
+events.on('contacts:submit', () => {
+  const buyer  = buyerModel.getData();
+  const items  = basketModel.getItems();
+  const total  = basketModel.getTotal();
+
+  larekApi
+    .orderProducts({
+      ...buyer,
+      items: items.map((p: IProduct) => p.id),
+      total,
+    })
+    .then((result) => {
+      modal.render({
+        content: successView.render({ total: result.total }),
+      });
+      basketModel.clear();
+      buyerModel.clear();
+      page.render({ counter: 0 });
+    })
+    .catch((err: string) => {
+      console.error('Ошибка при оформлении заказа:', err);
+    });
+});
+
+events.on('success:close', () => {
+  modal.close();
+});
+
+events.on('modal:close', () => {
+  page.render({ locked: false });
+});
+
+const _originalModalRender = modal.render.bind(modal);
+modal.render = (data) => {
+  page.render({ locked: true });
+  return _originalModalRender(data);
+};
+
+larekApi
+  .getProducts()
   .then((data) => {
     productsModel.setItems(data.items);
-    console.log('Данные каталога из модели (API):', productsModel.getItems());
+
+    page.render({
+      counter: basketModel.getCount(),
+      catalog: productsModel.getItems().map((product) => {
+        const card = new CardCatalog(cloneTemplate(cardCatalogTemplate), events);
+        return card.render({
+          id:       product.id,
+          title:    product.title,
+          image:    product.image,
+          price:    product.price,
+          category: product.category,
+        });
+      }),
+    });
   })
   .catch((err) => {
-    console.error('Ошибка при получении товаров с сервера:', err);
+    console.error('Ошибка загрузки товаров:', err);
   });

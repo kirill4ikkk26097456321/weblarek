@@ -1,6 +1,4 @@
-
 export type TPayment = 'card' | 'cash';
-
 
 export interface IProduct {
   id: string;
@@ -11,7 +9,6 @@ export interface IProduct {
   price: number | null;
 }
 
-
 export interface IBuyer {
   payment: TPayment | null;
   email: string;
@@ -19,21 +16,17 @@ export interface IBuyer {
   address: string;
 }
 
-
 export type FormErrors = Partial<Record<keyof IBuyer, string>>;
-
 
 export interface IOrder extends IBuyer {
   total: number;
   items: string[];
 }
 
-
 export interface IOrderResult {
   id: string;
   total: number;
 }
-
 
 export interface IProductList {
   total: number;

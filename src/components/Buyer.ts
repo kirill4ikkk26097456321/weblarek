@@ -1,4 +1,5 @@
 import { IBuyer, FormErrors } from '../types';
+import { IEvents } from './base/Events';
 
 export class Buyer {
   protected data: IBuyer = {
@@ -8,8 +9,12 @@ export class Buyer {
     address: ''
   };
 
+  constructor(protected events: IEvents) {}
+
   setField<K extends keyof IBuyer>(field: K, value: IBuyer[K]): void {
     this.data[field] = value;
+    this.events.emit('buyer:change', { field, value });
+    this.events.emit('formErrors:change', this.validate());
   }
 
   getData(): IBuyer {
@@ -23,11 +28,12 @@ export class Buyer {
       phone: '',
       address: ''
     };
+    this.events.emit('buyer:change', this.data);
   }
 
   validate(): FormErrors {
     const errors: FormErrors = {};
-    
+
     if (!this.data.payment) {
       errors.payment = 'Не выбран вид оплаты';
     }
@@ -40,7 +46,7 @@ export class Buyer {
     if (!this.data.phone) {
       errors.phone = 'Укажите телефон';
     }
-    
+
     return errors;
   }
 }
