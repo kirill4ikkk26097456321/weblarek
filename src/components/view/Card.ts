@@ -19,7 +19,6 @@ export interface ICardBasketData {
 
 export interface ICardPreviewData extends ICardData {
   description: string;
-  inBasket: boolean;
 }
 
 export class Card extends Component<ICardData> {
@@ -92,25 +91,18 @@ export class CardPreview extends Card {
     this._button      = container.querySelector<HTMLButtonElement>('.card__button')!;
 
     this._button.addEventListener('click', () => {
-      const id      = container.dataset['id'];
-      const inBasket = container.dataset['inBasket'] === 'true';
+      const id = container.dataset['id'];
       if (!id) return;
-      if (inBasket) {
-        this.events.emit<{ id: string }>('card:fromBasket', { id });
-      } else {
-        this.events.emit<{ id: string }>('card:toBasket', { id });
-      }
+      this.events.emit<{ id: string }>('card:toBasket', { id });
     });
   }
 
-  private updateButton(inBasket: boolean, price: number | null): void {
-    if (price === null) {
-      this._button.disabled     = true;
-      this._button.textContent  = 'Недоступно';
-    } else {
-      this._button.disabled    = false;
-      this._button.textContent = inBasket ? 'Удалить из корзины' : 'Купить';
-    }
+  set buttonText(value: string) {
+    this._button.textContent = value;
+  }
+
+  set buttonDisabled(value: boolean) {
+    this._button.disabled = value;
   }
 
   render(data: Partial<ICardPreviewData>): HTMLElement {
@@ -120,13 +112,6 @@ export class CardPreview extends Card {
 
     if (data.description !== undefined && this._description) {
       this._description.textContent = data.description;
-    }
-
-    const inBasket = data.inBasket ?? false;
-    this.container.dataset['inBasket'] = String(inBasket);
-
-    if (this._button) {
-      this.updateButton(inBasket, data.price ?? null);
     }
 
     return this.container;

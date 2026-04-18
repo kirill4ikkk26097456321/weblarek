@@ -55,12 +55,14 @@ export interface IOrderFormData extends IFormState {
 export class OrderForm extends Form<{ payment: string; address: string }> {
   private readonly _btnCard: HTMLButtonElement;
   private readonly _btnCash: HTMLButtonElement;
+  private readonly _addressInput: HTMLInputElement;
 
   constructor(container: HTMLFormElement, events: IEvents) {
     super(container, events);
 
-    this._btnCard = container.querySelector<HTMLButtonElement>('[name="card"]')!;
-    this._btnCash = container.querySelector<HTMLButtonElement>('[name="cash"]')!;
+    this._btnCard      = container.querySelector<HTMLButtonElement>('[name="card"]')!;
+    this._btnCash      = container.querySelector<HTMLButtonElement>('[name="cash"]')!;
+    this._addressInput = container.querySelector<HTMLInputElement>('[name="address"]')!;
 
     const handlePayment = (method: 'card' | 'cash') => {
       this.setPaymentActive(method);
@@ -91,9 +93,8 @@ export class OrderForm extends Form<{ payment: string; address: string }> {
       }
     }
 
-    if (data.address !== undefined) {
-      const input = this.container.querySelector<HTMLInputElement>('[name="address"]');
-      if (input) input.value = data.address;
+    if (data.address !== undefined && this._addressInput) {
+      this._addressInput.value = data.address;
     }
 
     return this.container;
@@ -106,21 +107,24 @@ export interface IContactsFormData extends IFormState {
 }
 
 export class ContactsForm extends Form<{ email: string; phone: string }> {
+  private readonly _emailInput: HTMLInputElement;
+  private readonly _phoneInput: HTMLInputElement;
+
   constructor(container: HTMLFormElement, events: IEvents) {
     super(container, events);
 
+    this._emailInput = container.querySelector<HTMLInputElement>('[name="email"]')!;
+    this._phoneInput = container.querySelector<HTMLInputElement>('[name="phone"]')!;
   }
 
   render(data: Partial<IContactsFormData>): HTMLElement {
     super.render(data);
 
-    if (data.email !== undefined) {
-      const input = this.container.querySelector<HTMLInputElement>('[name="email"]');
-      if (input) input.value = data.email;
+    if (data.email !== undefined && this._emailInput) {
+      this._emailInput.value = data.email;
     }
-    if (data.phone !== undefined) {
-      const input = this.container.querySelector<HTMLInputElement>('[name="phone"]');
-      if (input) input.value = data.phone;
+    if (data.phone !== undefined && this._phoneInput) {
+      this._phoneInput.value = data.phone;
     }
 
     return this.container;

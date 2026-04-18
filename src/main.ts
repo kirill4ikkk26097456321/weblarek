@@ -109,8 +109,22 @@ events.on<{ id: string }>('card:select', ({ id }) => {
   if (!product) return;
 
   productsModel.setPreview(product);
+});
 
+events.on<{ item: IProduct }>('preview:change', ({ item: product }) => {
   const card = new CardPreview(cloneTemplate(cardPreviewTemplate), events);
+
+  if (product.price === null) {
+    card.buttonDisabled = true;
+    card.buttonText     = 'Недоступно';
+  } else if (basketModel.contains(product.id)) {
+    card.buttonDisabled = false;
+    card.buttonText     = 'Удалить из корзины';
+  } else {
+    card.buttonDisabled = false;
+    card.buttonText     = 'Купить';
+  }
+
   modal.render({
     content: card.render({
       id:          product.id,
@@ -119,7 +133,6 @@ events.on<{ id: string }>('card:select', ({ id }) => {
       price:       product.price,
       category:    product.category,
       description: product.description,
-      inBasket:    basketModel.contains(product.id),
     }),
   });
 });
@@ -128,44 +141,18 @@ events.on<{ id: string }>('card:toBasket', ({ id }) => {
   const product = productsModel.getProduct(id);
   if (!product) return;
 
-  basketModel.add(product);
-
-  const preview = productsModel.getPreview();
-  if (preview?.id === id) {
-
-    const card = new CardPreview(cloneTemplate(cardPreviewTemplate), events);
-    modal.render({
-      content: card.render({
-        id:          preview.id,
-        title:       preview.title,
-        image:       preview.image,
-        price:       preview.price,
-        category:    preview.category,
-        description: preview.description,
-        inBasket:    true,
-      }),
-    });
+  if (basketModel.contains(id)) {
+    basketModel.remove(id);
+  } else {
+    basketModel.add(product);
   }
+
+  modal.close();
 });
 
 events.on<{ id: string }>('card:fromBasket', ({ id }) => {
   basketModel.remove(id);
-
-  const preview = productsModel.getPreview();
-  if (preview?.id === id) {
-    const card = new CardPreview(cloneTemplate(cardPreviewTemplate), events);
-    modal.render({
-      content: card.render({
-        id:          preview.id,
-        title:       preview.title,
-        image:       preview.image,
-        price:       preview.price,
-        category:    preview.category,
-        description: preview.description,
-        inBasket:    false,
-      }),
-    });
-  }
+  modal.close();
 });
 
 events.on<{ id: string }>('card:removeFromBasket', ({ id }) => {
